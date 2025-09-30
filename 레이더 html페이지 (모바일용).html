@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>KMA Radar Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #fff;
+      color: #000;
+      display: flex;
+      flex-direction: column;
+    }
+    .viewer {
+      flex: 1;
+      display: flex;
+      height: calc(100% - 84px);
+    }
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+    }
+    img {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #fff;
+      display: block;
+    }
+    .controls {
+      background: #fff;
+      padding: 10px;
+      border-top: 2px solid #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      height: 84px;
+      box-sizing: border-box;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .group { display: inline-flex; align-items: center; gap: 6px; }
+    .controls button, .controls input[type="datetime-local"], .controls label {
+      font-size: 14px;
+    }
+    .controls button, .controls input[type="datetime-local"] {
+      padding: 6px 10px;
+      border-radius: 5px;
+      border: 1px solid #999;
+      cursor: pointer;
+      background: #f5f5f5;
+    }
+    .controls button:hover { background: #e0e0e0; }
+    #timeLabel { font-weight: bold; margin-left: 8px; }
+    .hidden { display: none !important; }
+
+    /* 모바일에서는 위아래(세로) 배치 */
+    @media (max-width: 768px) {
+      .viewer {
+        flex-direction: column;
+      }
+    }
+  </style>
+  <script>
+    let autoTimer = null;
+
+    function formatTime(date) {
+      const yyyy = date.getFullYear();
+      const MM = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      const HH = String(date.getHours()).padStart(2, '0');
+      const mm = String(date.getMinutes()).padStart(2, '0');
+      return `${yyyy}${MM}${dd}${HH}${mm}`;
+    }
+
+    function getRoundedNow() {
+      const now = new Date();
+      const minutes = Math.floor(now.getMinutes() / 5) * 5;
+      now.setMinutes(minutes);
+      now.setSeconds(0);
+      now.setMilliseconds(0);
+      return now;
+    }
+
+    function toLocalISO(dt) {
+      const tzAdjusted = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000);
+      return tzAdjusted.toISOString().slice(0, 16);
+    }
+
+    function updateImages() {
+      const inputEl = document.getElementById("datetime");
+      const input = inputEl.value;
+      if (!input) return;
+      const dt = new Date(input);
+      const tm = formatTime(dt);
+
+      document.getElementById("img1").src =
+        `https://radar.kma.go.kr/cgi-bin/tablet2/nph-rdr_cmp_img?tm=${tm}&cmp=HSP&qcd=HSO&obs=ECHD&map=HC&size=800&xp=-9999&yp=-9999&zoom=2&wv=01&ht=800&color=C4&topo=1`;
+
+      document.getElementById("img2").src =
+        `https://afso.kma.go.kr/cgi/rdr/nph-rdr_cmp1_img?tm=${tm}&cmp=HSP&qcd=HSLP&obs=ECHD&color=C4&aws=0&acc=0&map=HC&grid=2&legend=1&size=700&itv=5&zoom_level=1&zoom_x=3350000&zoom_y=5120000&gov=`;
+
+      document.getElementById("img3").src =
+        `https://radar.kma.go.kr/cgi-bin/tablet2/nph-rdr_cmp_img?tm=${tm}&cmp=HSP&qcd=HSO&obs=ECHD&map=E&size=800&xp=330&yp=620&zoom=5&wv=01&ht=800&color=C4&topo=1`;
+
+      document.getElementById("timeLabel").innerText = `선택된 시각: ${tm}`;
+    }
+
+    function setNow() {
+      const now = getRoundedNow();
+      document.getElementById("datetime").value = toLocalISO(now);
+      updateImages();
+    }
+
+    function shiftTime(mins) {
+      const inputEl = document.getElementById("datetime");
+      const input = inputEl.value;
+      if (!input) return;
+      const dt = new Date(input);
+      dt.setMinutes(dt.getMinutes() + mins);
+      inputEl.value = toLocalISO(dt);
+      updateImages();
+    }
+
+    function showImage(imgId) {
+      const img2 = document.getElementById("img2");
+      const img3 = document.getElementById("img3");
+      if (imgId === '2') {
+        img2.classList.remove("hidden");
+        img3.classList.add("hidden");
+      } else {
+        img3.classList.remove("hidden");
+        img2.classList.add("hidden");
+      }
+    }
+
+    function toggleAutoRefresh(checked) {
+      if (autoTimer) {
+        clearInterval(autoTimer);
+        autoTimer = null;
+      }
+      if (checked) {
+        setNow();
+        autoTimer = setInterval(setNow, 300000); // 5분마다 자동 갱신
+      }
+    }
+
+    window.addEventListener('load', () => {
+      setNow();
+      document.getElementById('autoRefresh').addEventListener('change', (e) => toggleAutoRefresh(e.target.checked));
+      document.getElementById('datetime').addEventListener('change', updateImages);
+    });
+  </script>
+</head>
+<body>
+  <div class="viewer">
+    <div class="panel">
+      <img id="img1" alt="Radar Image 1">
+    </div>
+    <div class="panel">
+      <img id="img2" alt="Radar Image 2">
+      <img id="img3" alt="Radar Image 3" class="hidden">
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="group">
+      <label for="datetime">시간 선택:</label>
+      <input type="datetime-local" id="datetime">
+      <button onclick="updateImages()">적용</button>
+      <button onclick="setNow()">현재</button>
+      <label class="group" style="gap:4px; cursor:pointer;">
+        <input type="checkbox" id="autoRefresh" style="cursor:pointer;">
+        자동 갱신(5분)
+      </label>
+    </div>
+
+    <div class="group">
+      <button onclick="shiftTime(-60)">-60분</button>
+      <button onclick="shiftTime(-30)">-30분</button>
+      <button onclick="shiftTime(-10)">-10분</button>
+      <button onclick="shiftTime(-5)">-5분</button>
+      <button onclick="shiftTime(5)">+5분</button>
+      <button onclick="shiftTime(10)">+10분</button>
+      <button onclick="shiftTime(30)">+30분</button>
+      <button onclick="shiftTime(60)">+60분</button>
+    </div>
+
+    <div class="group">
+      <button onclick="showImage('2')">레이더(경기도)</button>
+      <button onclick="showImage('3')">레이더+바람(경기도)</button>
+      <span id="timeLabel"></span>
+    </div>
+  </div>
+</body>
+</html>
